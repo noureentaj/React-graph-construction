@@ -1,5 +1,3 @@
-import { PlaylistAddOutlined } from "@material-ui/icons";
-
 export const basics = {
   on_login,
   setUI,
@@ -27,13 +25,13 @@ async function on_login() {
   return json;
 }
 
-async function setUI(n_id, n_type, cust_id, x, y) {
-
+async function setUI(n_id, n_type, title, x, y) {
+  console.log(n_id, n_type, title, x, y)
   const requestOptions = {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify([{
-      "title": cust_id,
+      "title": title,
       "x": x,
       "y": y,
       "id": n_id,
@@ -144,15 +142,13 @@ async function get_customer_info(customer) {
     }),
   };
 
-  return fetch(
+  const response = await fetch(
     `http://localhost:11000/get_customer_info`,
     requestOptions
-  )
-    .then((response) => response.json())
-    .then((data) => {
-      console.log(data)
-      return data
-    });
+  );
+  const json = await response.json();
+  console.log("From cust info", json)
+  return json;
 }
 
 async function delete_relation(payload) {
@@ -177,3 +173,25 @@ async function delete_relation(payload) {
       return data
     });
 }
+
+    // var content;
+    // const requestOptions = {
+    //   method: "POST",
+    //   headers: { "Content-Type": "application/json" },
+    //   body: JSON.stringify({
+    //     "cust_id": viewNode.id
+    //   }),
+    // };
+    // content = fetch(
+    //   `http://localhost:11000/get_customer_info`,
+    //   requestOptions
+    // )
+    //   .then((response) => response.json())
+    //   .then((data) => {
+    //     let dict = data[viewNode.type][0]
+    //     let Address_Line_1 = dict["Address_Line_1"]
+    //     let Address_Line_2 = dict["Address_Line_2"]
+    //     let zip = dict["ZIP_CD"]
+    //     let cust_name = dict["cust_name"]
+    //     swal(cust_name, "Address: " + Address_Line_1 + " " + Address_Line_2 + " " + "ZIP :" + zip);
+    //   });

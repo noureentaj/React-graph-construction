@@ -6,7 +6,7 @@ import Background2 from '../static/Customer360.jpg';
 
 const HomeScreen = () => {
     const routeGraph = () => {
-        let path = `/graph`;
+        let path = `/album`;
         window.location = path
     }
     const route360 = () => {

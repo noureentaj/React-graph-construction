@@ -27,13 +27,13 @@ async function on_login() {
   return json;
 }
 
-async function setUI(n_id, n_type, cust_id, x, y) {
-
+async function setUI(n_id, n_type, title, x, y) {
+  console.log(n_id, n_type, title, x, y)
   const requestOptions = {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify([{
-      "title": cust_id,
+      "title": title,
       "x": x,
       "y": y,
       "id": n_id,

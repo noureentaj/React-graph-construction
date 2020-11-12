@@ -43,16 +43,19 @@ const Preview = () => {
   return (
     <div>
       <ForceGraph3D
+        backgroundColor="white"
+        linkAutoColorBy="source"
+        linkWidth={1}
         ref={fgRef}
-        linkDirectionalParticles="10"
+        linkDirectionalParticles={2}
         nodeLabel="id"
         linkLabel="label"
         nodeAutoColorBy="group"
         onNodeClick={handleClick}
         linkDirectionalArrowLength={3.5}
         linkDirectionalArrowRelPos={1}
-        graphData={json} 
-        />
+        graphData={json}
+      />
       <Button variant="contained" color="primary" onClick={redirectGraph}>Go back to graph construction</Button>
     </div>)
 }

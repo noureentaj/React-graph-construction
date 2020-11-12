@@ -1,22 +1,17 @@
 import React, { Component } from "react";
-import {
-  GraphView // required
-} from "react-digraph";
-import ReactDOM from "react-dom";
+import {GraphView} from "react-digraph";
 import { basics } from "../services/basics";
 import {
   HCO, default as nodeConfig,
   NODE_KEY,
-  HCP, SPECIAL_EDGE_TYPE,
-  SPECIAL_TYPE
+  HCP, SPECIAL_EDGE_TYPE
 } from "../config";
 import Modal from "../Modal";
 import "../styles.css";
 import Drawer from "./Drawer";
 import { Button } from "@material-ui/core";
-import Divider from '@material-ui/core/Divider';
-import { Input } from '@material-ui/core';
-import swal from 'sweetalert';
+import Explore from './Explore';
+
 
 const sample = {
   "nodes": [],
@@ -32,11 +27,14 @@ class Graph extends Component {
       selected: {},
       hcp: [],
       hco: [],
-      visibility: true,
-      searchInput: "",
-      searchInputhcp: "",
+      showInfo: false,
       datahcp: [],
-      datahco: []
+      datahco: [],
+      showMenu: false,
+      custInfo: [],
+      menuX: "",
+      menuY: "",
+      selectedId: ""
     };
   }
 
@@ -118,12 +116,13 @@ class Graph extends Component {
   addStartNodehco = e => {
     const graph = this.state.graph;
     const cust_id = e.target.getAttribute("val")
+    const cust_name = e.target.getAttribute("title")
     // using a new array like this creates a new memory reference
     // this will force a re-render
     graph.nodes = [
       {
         id: cust_id,
-        title: cust_id,
+        title: cust_name,
         type: HCO,
         x: e ? e.screenX : 0, //Figure out the correct coordinates to drop
         y: e ? e.screenY : 0
@@ -133,17 +132,18 @@ class Graph extends Component {
     this.setState({
       graph
     });
-    basics.setUI(cust_id, "HCO", cust_id, e.screenX, e.screenY)
+    basics.setUI(cust_id, "HCO", cust_name, e.screenX, e.screenY)
   };
   addStartNodehcp = e => {
     const graph = this.state.graph;
     const cust_id = e.target.getAttribute("val")
+    const cust_name = e.target.getAttribute("title")
     // using a new array like this creates a new memory reference
     // this will force a re-render
     graph.nodes = [
       {
         id: cust_id,
-        title: cust_id,
+        title: cust_name,
         type: HCP,
         x: e ? e.screenX : 0, //Figure out the correct coordinates to drop
         y: e ? e.screenY : 0
@@ -153,7 +153,7 @@ class Graph extends Component {
     this.setState({
       graph
     });
-    basics.setUI(cust_id, "HCP", cust_id, e.screenX, e.screenY)
+    basics.setUI(cust_id, "HCP", cust_name, e.screenX, e.screenY)
   };
 
   deleteStartNode = () => {
@@ -177,12 +177,6 @@ class Graph extends Component {
     );
   };
 
-  /*
-   * Handlers/Interaction
-   */
-
-  // Called by 'drag' handler, etc..
-  // to sync updates from D3 with the graph
   onUpdateNode = (viewNode, e) => {
     const graph = this.state.graph;
     const i = this.getNodeIndex(viewNode);
@@ -190,42 +184,28 @@ class Graph extends Component {
     graph.nodes[i] = viewNode;
     this.setState({ graph });
     if (viewNode) {
-      basics.setUI(viewNode.title, viewNode.type, viewNode.title, viewNode.x, viewNode.y)
+      basics.setUI(viewNode.id, viewNode.type, viewNode.title, viewNode.x, viewNode.y)
+
     }
   };
 
-  // Node 'mouseUp' handler
   onSelectNode = (viewNode, event) => {
+    console.log(viewNode,event)
     if (event) {
       const { id = viewNode.id } = event.target;
       if (id.includes("text")) {
         document.getElementById(event.target.id).click();
       }
-
-      // Deselect events will send Null viewNode
       this.setState({ selected: viewNode });
-        var content;
-        const requestOptions = {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            "cust_id": viewNode.title
-          }),
-        };
-        content = fetch(
-          `http://localhost:11000/get_customer_info`,
-          requestOptions
-        )
-          .then((response) => response.json())
-          .then((data) => {
-            let dict = data[viewNode.type][0]
-            let Address_Line_1 = dict["Address_Line_1"]
-            let Address_Line_2 = dict["Address_Line_2"]
-            let zip = dict["ZIP_CD"]
-            let cust_name = dict["cust_name"]
-            swal(cust_name, "Address: " + Address_Line_1 + " " + Address_Line_2 + " " + "ZIP :" + zip);
-          });
+
+      basics.get_customer_info(viewNode.id)
+        .then((data) => {
+          this.setState({ custInfo: data[viewNode.type][0] })
+          this.setState({ showInfo: true })
+          console.log("YES", this.state.custInfo)
+        })
     }
+
   };
 
   // Edge 'mouseUp' handler
@@ -233,32 +213,9 @@ class Graph extends Component {
     this.setState({ selected: viewEdge });
   };
 
-  // Updates the graph with a new node
-  onCreateNode = (x, y) => {
-    const graph = this.state.graph;
-
-    // This is just an example - any sort of logic
-    // could be used here to determine node type
-    // There is also support for subtypes. (see 'sample' above)
-    // The subtype geometry will underlay the 'type' geometry for a node
-    const type = Math.random() < 0.25 ? SPECIAL_TYPE : HCO;
-
-    const viewNode = {
-      id: "",
-      title: "",
-      type,
-      x,
-      y
-    };
-
-    graph.nodes = [...graph.nodes, viewNode];
-    this.setState({ graph });
-  };
-
-
-
   // Deletes a node from the graph
   onDeleteNode = (viewNode, nodeId, nodeArr) => {
+    console.log(viewNode, nodeId, nodeArr)
     const graph = this.state.graph;
     // Delete any connected edges
     const newEdges = graph.edges.filter((edge, i) => {
@@ -279,11 +236,12 @@ class Graph extends Component {
     graph.edges = newEdges;
 
     this.setState({ graph, selected: null });
-    basics.unsetUI(viewNode.title)
+    basics.unsetUI(viewNode.id)
   };
 
   // Creates a new node between two edges
   onCreateEdge = (sourceViewNode, targetViewNode) => {
+    console.log(sourceViewNode, targetViewNode)
     const relation = window.prompt("Enter relationship");
     if (!relation) {
       const relation = "default";
@@ -370,20 +328,6 @@ class Graph extends Component {
     });
   };
 
-  // onPasteSelected = () => {
-  //   if (!this.state.copiedNode) {
-  //     console.warn(
-  //       "No node is currently in the copy queue. Try selecting a node and copying it with Ctrl/Command-C"
-  //     );
-  //   }
-
-  //   const graph = this.state.graph;
-  //   const newNode = { ...this.state.copiedNode, id: Date.now() };
-
-  //   graph.nodes = [...graph.nodes, newNode];
-  //   this.forceUpdate();
-  // };
-
   handleChangeLayoutEngineType = event => {
     this.setState({
       layoutEngineType: event.target.value
@@ -418,7 +362,6 @@ class Graph extends Component {
         }
         getjson["nodes"][i]["x"] = parseInt(x)
         getjson["nodes"][i]["y"] = parseInt(y)
-
       }
       this.setState({ graph: getjson })
       this.setState({ hcp: response["HCP"] });
@@ -432,74 +375,29 @@ class Graph extends Component {
     }
   }
   /* Define custom graph editing methods here */
-  handletabVis = () => {
-    this.setState({ visibility: !this.state.visibility });
-  }
-  handleInputChange = event => {
-    const name = event.target.name;
-    const val = event.target.value;
-    this.setState({ [name]: val });
-    if (name === "searchInput") {
-      if (val.length !== 0) {
-        this.globalSearch(val, this.state.hco, name);
-      }
-    }
-    if (name === "searchInputhcp") {
-      if (val.length !== 0) {
-        this.globalSearch(val, this.state.hcp, name);
-      }
-    }
-  };
-  globalSearch = (searchInput, full_data, search_name) => {
-    if (searchInput.length !== 0) {
-      let filteredData = full_data.filter(value => {
-        return (
-          value.custId.toLowerCase().includes(searchInput.toLowerCase()) ||
-          value.cust_name.toLowerCase().replace(/\s/g, '_').includes(searchInput.replace(/\s/g, '_'))
 
-        );
-      });
-      if (search_name === "searchInput") {
-        this.setState({ datahco: filteredData });
-      }
-      if (search_name === "searchInputhcp") {
-        this.setState({ datahcp: filteredData });
-      }
-    }
-    else {
-      if (search_name === "searchInput") {
-        this.setState({ datahco: this.state.hco });
-      }
-      if (search_name === "searchInputhcp") {
-        this.setState({ datahcp: this.state.hcp });
-      }
-    }
-  };
   render() {
     const nodes = this.state.graph.nodes;
     const edges = this.state.graph.edges;
     const selected = this.state.selected;
 
     return (
-      <div style={{ backgroundColor: "black", padding: "20px" }}>
-        <div class="header">
-          <h1>Graph PoC</h1>
-          <p>Affiliation Management</p>
-        </div>
-        <br />
-        <Divider></Divider>
-        <br />
-        <Button style={{ float: "right" }} variant="contained" color="primary" onClick={this.handlePreview}>3D Preview</Button>
-        <Drawer
-          hcoData={this.state.datahco}
-          hcpData={this.state.datahcp}
-          addStartNodehco={this.addStartNodehco}
-          handleInputChange={this.handleInputChange}
-        ></Drawer>
-        <br />
-        <Divider></Divider>
-        <br />
-        <div id="graph" style={{ height: "500px" }}>
+      <div>
+        {this.state.showInfo ?
+          <Explore closed={() => { this.setState({ showInfo: false }) }} info={this.state.custInfo}></Explore>
+          : null}
+
+        <div id="graph" style={{ height: "400px", width:"70%" }}>
+
+          <div style={{ backgroundColor: "white", padding: "10px" }}>
+            <Button style={{ float: "right", marginRight: "100px" }} variant="contained" color="primary" onClick={this.handlePreview}>Explore</Button>
+            <Drawer
+              hcoData={this.state.datahco}
+              hcpData={this.state.datahcp}
+              addStartNodehcp={this.addStartNodehcp}
+              addStartNodehco={this.addStartNodehco}
+            ></Drawer>
+          </div>
           <GraphView
             showGraphControls={true}
             gridSize="100rem"
@@ -522,58 +420,9 @@ class Graph extends Component {
             onSwapEdge={this.onSwapEdge}
             onDeleteEdge={this.onDeleteEdge}
             readOnly={false}
-          //renderNode={this.renderNode}
           />
-          <br />
-          <br />
-          <br />
-          <Button variant="contained" color="primary" onClick={this.handletabVis}>Toggle table visibility</Button>
-          <br />
-          <br />
-          <Divider></Divider>
-          <br />
-          <div>
-            <div style={{ float: "right" }}>
-              {this.state.visibility ?
-                <div>
-                  <p>HCO</p>
-                  <Input
-                    onChange={this.handleInputChange}
-                    name="searchInput"
-                    value={this.state.searchInput || ""}
-                    placeholder="Search.." />
-                </div>
-                : null}
-              {this.state.visibility && this.state.datahco.map((item, index) => {
-                return (
-                  <div key={index}>
-                    <p className="Tables" val={item.custId} draggable onDragEnd={e => this.addStartNodehco(e)}>{item.cust_name}</p >
-                  </div >
-                );
-              })}
-            </div>
-            <div style={{ float: "left" }}>
-              {this.state.visibility ?
-                <div>
-                  <p>HCP</p>
-                  <Input
-                    onChange={this.handleInputChange}
-                    name="searchInputhcp"
-                    value={this.state.searchInputhcp || ""}
-                    placeholder="Search.." />
-                </div>
-                : null}
-              {this.state.visibility && this.state.datahcp.map((item, index) => {
-                return (
-                  <div key={index}>
-                    <p className="Tables" val={item.custId} draggable onDragEnd={e => this.addStartNodehcp(e)}>{item.cust_name}</p >
-                  </div >
-                );
-              })}
-            </div>
-          </div>
         </div>
-      </div>
+      </div >
     );
   }
 }
